@@ -1,12 +1,12 @@
 # pack-companions-sdk
 
-Python SDK for the [Pack Companions Service](https://github.com/getpacked/pack-companions) — AI companions across the Pack ecosystem.
+Python SDK for the [Pack Companions Service](https://github.com/TravisRaygoza/pack-companions) — AI companions across the Pack ecosystem.
 
 ## What this is
 
 A thin, async Python client that lets your FastAPI (or any Python) app talk to the Pack Companions service without dealing with HMAC signing, retries, or the WebSocket dance manually.
 
-If you're consuming companions from a frontend, see [`@getpacked/companions`](https://github.com/getpacked/pack-companions-js) instead.
+If you're consuming companions from a frontend, see [`@getpacked/companions`](https://github.com/TravisRaygoza/pack-companions-js) instead.
 
 ## Install
 
@@ -51,4 +51,4 @@ A compatibility table will be maintained here as the service stabilizes.
 
 ## License
 
-UNLICENSED — internal GetPacked / Pack ecosystem SDK.
+MIT — see [LICENSE](LICENSE).
