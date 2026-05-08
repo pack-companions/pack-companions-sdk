@@ -26,6 +26,12 @@ dependencies = [
     "pydantic>=2.0.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/TravisRaygoza/pack-companions-sdk"
+Repository = "https://github.com/TravisRaygoza/pack-companions-sdk"
+Issues = "https://github.com/TravisRaygoza/pack-companions-sdk/issues"
+"Service repo" = "https://github.com/TravisRaygoza/pack-companions"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",

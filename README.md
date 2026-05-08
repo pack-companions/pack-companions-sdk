@@ -6,7 +6,7 @@ Python SDK for the [Pack Companions Service](https://github.com/TravisRaygoza/pa
 
 A thin, async Python client that lets your FastAPI (or any Python) app talk to the Pack Companions service without dealing with HMAC signing, retries, or the WebSocket dance manually.
 
-If you're consuming companions from a frontend, see [`@getpacked/companions`](https://github.com/TravisRaygoza/pack-companions-js) instead.
+If you're consuming companions from a frontend, see [`@pack-companions/companions`](https://github.com/pack-companions/pack-companions-js) (transport) and [`@pack-companions/companions-react`](https://github.com/pack-companions/pack-companions-js) (visual layer) instead.
 
 ## Install
 
