@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "description": "Known Answer Tests for Pack Companions HMAC request signing. Locks the wire protocol byte-for-byte across the service (app/services/auth.py), Python SDK (pack_companions/_signing.py), and JS SDK (packages/companions/src/signing.ts). All three implementations MUST produce these exact signatures given these inputs. Updates require updating ALL THREE test suites — by design.",
+  "secret": "test-secret-32-chars-long-xxxxxxx",
+  "vectors": [
+    {
+      "name": "empty_body_post",
+      "method": "POST",
+      "path": "/v1/companion/comment",
+      "body": "",
+      "timestamp": "1700000000",
+      "expected": "9487f76f01fc81a90bb84aeff885816f4ef3313e141c8272e7e6f7cde45b80cc"
+    },
+    {
+      "name": "simple_json_post",
+      "method": "POST",
+      "path": "/v1/conversation/start",
+      "body": "{\"a\":1,\"b\":2}",
+      "timestamp": "1700000000",
+      "expected": "437671e3b2de5c853bde1ead020294c52b238c84fd1f9805627d30e4a41f4cc8"
+    },
+    {
+      "name": "canonical_json_post",
+      "method": "POST",
+      "path": "/v1/conversation/turn",
+      "body": "{\"conversation_id\":\"abc\",\"message\":\"hello\"}",
+      "timestamp": "1700000050",
+      "expected": "416671b952c3da15f195c9e3d63e33ce4ed2d1f3cf6d5ed32c5c5fdf6709519d"
+    },
+    {
+      "name": "unicode_body_post",
+      "method": "POST",
+      "path": "/v1/companion/comment",
+      "body": "{\"text\":\"hello 🐺 friend\"}",
+      "timestamp": "1700000100",
+      "expected": "57d07329b1cccfbb17e18b85fae23dddf355cd9589d25e77b3c39dfe05b9b8cf"
+    },
+    {
+      "name": "get_no_body",
+      "method": "GET",
+      "path": "/v1/health",
+      "body": "",
+      "timestamp": "1700000200",
+      "expected": "fd4961738d6afea41b78408beb630607f8b0eb7c451605042264caeeaa5939d8"
+    },
+    {
+      "name": "path_with_query",
+      "method": "GET",
+      "path": "/v1/list?limit=10",
+      "body": "",
+      "timestamp": "1700000300",
+      "expected": "d31f7db00503aac7d8da7754bdff1d49b3221c08cf2905a38616b432ab4cb950"
+    },
+    {
+      "name": "lowercase_method_normalizes",
+      "method": "post",
+      "path": "/v1/x",
+      "body": "{\"k\":\"v\"}",
+      "timestamp": "1700000400",
+      "expected": "ce3b022b5d71551f4484868c281e6757229ee6d08a6986f63d6103190e1d43ff"
+    },
+    {
+      "name": "newline_in_body",
+      "method": "POST",
+      "path": "/v1/x",
+      "body": "{\"text\":\"line1\\nline2\"}",
+      "timestamp": "1700000500",
+      "expected": "ba0ae3d144d15384ecfe9d74f15d48eb577c8a6479f766928dde80a915e3bf7e"
+    },
+    {
+      "name": "empty_string_equivalent_to_no_body",
+      "method": "POST",
+      "path": "/v1/x",
+      "body": "",
+      "timestamp": "1700000600",
+      "expected": "5ea818da2c30c9849928fb26a80d3839b0f79633df312e712ad722c322a2d42f"
+    }
+  ]
+}
