@@ -33,6 +33,14 @@ class SnapshotUser(BaseModel):
     companion_id: str
     streak: int = 0
     display_name: str | None = None
+    # Phase H — optional cross-app identity signal. sha256 hex digest of
+    # the user's normalized email (email.strip().lower()). When present,
+    # the service uses it as the canonical global_user_id so companion
+    # memory follows the user across apps. Use pack_companions.hash_email()
+    # to produce it correctly. Plaintext email never crosses the wire.
+    email_hash: str | None = Field(
+        default=None, min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
+    )
 
 
 class SnapshotLocation(BaseModel):

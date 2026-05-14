@@ -6,6 +6,7 @@ from pack_companions.client import (
     CompanionsAuthError,
     CompanionsClient,
 )
+from pack_companions.hashing import hash_email
 from pack_companions.snapshot import (
     CompanionSnapshot,
     SnapshotActivity,
@@ -16,7 +17,7 @@ from pack_companions.snapshot import (
     SnapshotUser,
 )
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 __all__ = [
     "CompanionsClient",
     "CompanionsAuthError",
@@ -29,4 +30,5 @@ __all__ = [
     "SnapshotProblem",
     "SnapshotCourse",
     "SnapshotHistory",
+    "hash_email",
 ]
