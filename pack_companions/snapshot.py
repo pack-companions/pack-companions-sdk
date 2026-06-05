@@ -24,6 +24,11 @@ MilestoneType = Literal[
     "level_up",
     "achievement_unlocked",
     "daily_challenge_completed",
+    # Event-driven streak celebration — push it (value = crossed marker)
+    # on the snapshot where the streak crosses a marker, so the service
+    # celebrates the event once instead of the raw streak value on every
+    # POST. Mirrors app/schemas/snapshot.py in the service.
+    "streak_milestone",
 ]
 
 
