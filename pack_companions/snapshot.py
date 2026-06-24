@@ -75,6 +75,11 @@ class SnapshotProblem(BaseModel):
     hint_used: bool = False
     pattern_first_touch: bool = False
     followup_available: bool = False
+    # Server-side enriched. category is the problem's track (e.g.
+    # "debugging"); bug_type is the planted-bug class on debugging problems
+    # only (null elsewhere). Both optional so pricing/mobile snapshots omit them.
+    category: str | None = None
+    bug_type: str | None = None
 
 
 class SnapshotCourse(BaseModel):
