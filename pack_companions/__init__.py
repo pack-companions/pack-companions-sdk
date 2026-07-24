@@ -66,6 +66,17 @@ from pack_companions.privacy import (
     ShareMemoryEvent,
     ShareMemoryResult,
 )
+from pack_companions.runtime_catalog import (
+    MAX_RUNTIME_CATALOG_BYTES,
+    RUNTIME_CATALOG_DISCOVERY_PATH,
+    RUNTIME_CATALOG_SCHEMA_VERSION,
+    RUNTIME_CDN_ORIGIN,
+    RUNTIME_DISCOVERY_SCHEMA_VERSION,
+    RUNTIME_FALLBACK,
+    RuntimeCatalogDiscoveryResponse,
+    RuntimeCatalogPointer,
+    RuntimePackAvailability,
+)
 from pack_companions.snapshot import (
     CompanionSnapshot,
     SnapshotActivity,
@@ -78,7 +89,7 @@ from pack_companions.snapshot import (
     SnapshotUser,
 )
 
-__version__ = "0.2.2"
+__version__ = "0.3.0"
 __all__ = [
     "CompanionsClient",
     "CompanionsError",
@@ -100,6 +111,15 @@ __all__ = [
     "ManifestCapability",
     "ManifestExpressionSurface",
     "ManifestForbiddenAssumption",
+    "RUNTIME_CATALOG_DISCOVERY_PATH",
+    "RUNTIME_DISCOVERY_SCHEMA_VERSION",
+    "RUNTIME_CATALOG_SCHEMA_VERSION",
+    "RUNTIME_CDN_ORIGIN",
+    "RUNTIME_FALLBACK",
+    "MAX_RUNTIME_CATALOG_BYTES",
+    "RuntimeCatalogDiscoveryResponse",
+    "RuntimeCatalogPointer",
+    "RuntimePackAvailability",
     "Comment",
     "CommentEvent",
     "CommentEventType",

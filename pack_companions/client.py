@@ -45,6 +45,7 @@ from pack_companions.privacy import (
     ShareMemoryEvent,
     ShareMemoryResult,
 )
+from pack_companions.runtime_catalog import RuntimeCatalogDiscoveryResponse
 from pack_companions.snapshot import CompanionSnapshot
 
 
@@ -229,6 +230,23 @@ class CompanionsClient:
             data,
             AppManifestResponse,
             invalid_message="service returned an invalid app manifest",
+        )
+
+    async def get_runtime_catalog(self) -> RuntimeCatalogDiscoveryResponse:
+        """Return validated runtime availability and immutable catalog pointers.
+
+        This discovery call does not fetch or validate any referenced asset
+        catalog. Renderer SDKs and native clients own that boundary.
+        """
+        data = await self._signed_request(
+            "GET",
+            RuntimeCatalogDiscoveryResponse.PATH,
+            max_attempts=1,
+        )
+        return self._parse_model(
+            data,
+            RuntimeCatalogDiscoveryResponse,
+            invalid_message=("service returned an invalid runtime catalog discovery response"),
         )
 
     async def identify(self, request: IdentifyRequest) -> IdentifyResponse:

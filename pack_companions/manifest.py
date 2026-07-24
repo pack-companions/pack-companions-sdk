@@ -166,6 +166,7 @@ class ManifestEndpoints(_ManifestModel):
         ("letters", "/v1/companion/letters"),
         ("letters_ack", "/v1/companion/letters/ack"),
         ("companion_picker", "/v1/companions/picker"),
+        ("runtime_catalog", "/v1/runtime-catalog"),
     )
 
     comment: str
@@ -190,6 +191,7 @@ class ManifestEndpoints(_ManifestModel):
     letters: str
     letters_ack: str
     companion_picker: str
+    runtime_catalog: str
 
     @model_validator(mode="after")
     def _paths_match_platform_v2(self) -> ManifestEndpoints:
@@ -206,6 +208,7 @@ class ManifestService(_ManifestModel):
     platform_contract_version: str = Field(min_length=5, max_length=64)
     comment_contract_version: Literal["v1"]
     picker_version: str = Field(min_length=1, max_length=64)
+    runtime_catalog_schema_version: Literal["pack-runtime-catalog/v1"]
 
     @field_validator("platform_contract_version")
     @classmethod
