@@ -91,11 +91,11 @@ class RuntimeCatalogDiscoveryResponse(_RuntimeDiscoveryModel):
     schema_version: Literal["pack-runtime-discovery/v1"]
     catalog_schema_version: Literal["pack-runtime-catalog/v1"]
     asset_origin: Literal["https://companion-frames.getpacked.ai"]
-    quarantined_asset_prefixes: tuple[Literal["byte"], ...] = Field(
-        min_length=1,
-        max_length=1,
-    )
-    companions: tuple[RuntimePackAvailability, ...] = Field(max_length=64)
+    # Pydantic 2.0 mis-applies collection ``max_length`` constraints to
+    # tuples. Keep the exact bounds in validators so the minimum supported
+    # runtime and current releases enforce the same wire contract.
+    quarantined_asset_prefixes: tuple[Literal["byte"], ...]
+    companions: tuple[RuntimePackAvailability, ...]
 
     @field_validator("quarantined_asset_prefixes")
     @classmethod
@@ -109,6 +109,8 @@ class RuntimeCatalogDiscoveryResponse(_RuntimeDiscoveryModel):
 
     @model_validator(mode="after")
     def _roster_identities_are_unique(self) -> RuntimeCatalogDiscoveryResponse:
+        if len(self.companions) > 64:
+            raise ValueError("runtime discovery companion count exceeds the limit")
         character_ids = tuple(item.character_id for item in self.companions)
         species_ids = tuple(item.species_id for item in self.companions)
         if len(character_ids) != len(set(character_ids)):
