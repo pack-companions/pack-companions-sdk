@@ -14,7 +14,7 @@ def test_runtime_and_distribution_versions_match_release() -> None:
     match = re.search(r'^version = "([^"]+)"$', pyproject, flags=re.MULTILINE)
 
     assert match is not None
-    assert match.group(1) == pack_companions.__version__ == "0.3.0"
+    assert match.group(1) == pack_companions.__version__ == "0.3.1"
 
 
 def test_typed_marker_and_canonical_project_metadata_are_present() -> None:

@@ -73,6 +73,15 @@ class CompanionsServiceError(CompanionsError):
         super().__init__(f"Pack Companions service returned HTTP {status_code}")
 
 
+class ExistingIdentityLinkRequiredError(CompanionsServiceError):
+    """Existing-only identify found no active link for the authenticated host pair."""
+
+    code = "existing_identity_link_required"
+
+    def __init__(self) -> None:
+        super().__init__(404)
+
+
 class PrivacyOperationError(CompanionsServiceError):
     """Sanitized, actionable error from a generation-bound mutation.
 
@@ -256,7 +265,13 @@ class CompanionsClient:
         and reset the host's persisted generation. It must be initiated for a
         genuinely new authenticated operation; never call it to refresh a
         stale queued privacy event and replay that old payload.
+
+        Set ``require_existing_link=True`` when repairing missing local token
+        state for an authenticated account that Pack must already know. That
+        mode fails rather than creating or mutating an identity and always
+        returns ``is_new=False``.
         """
+        require_existing_link = request.require_existing_link
         body = request.request_bytes
         del request
         try:
@@ -265,16 +280,22 @@ class CompanionsClient:
                 "/v1/identity/identify",
                 body=body,
                 max_attempts=1,
+                classify_existing_identity_miss=require_existing_link,
             )
         except CompanionsError:
             body = b""
             raise
         body = b""
-        return self._parse_model(
+        response = self._parse_model(
             data,
             IdentifyResponse,
             invalid_message="service returned an invalid identify response",
         )
+        if require_existing_link and response.is_new:
+            raise CompanionsProtocolError(
+                "service created an identity during existing-only recovery"
+            )
+        return response
 
     async def get_connected_apps_status(
         self,
@@ -599,6 +620,7 @@ class CompanionsClient:
         max_attempts: int = 1,
         retryable_statuses: frozenset[int] = frozenset(),
         classify_privacy_error: bool = False,
+        classify_existing_identity_miss: bool = False,
     ) -> dict[str, Any]:
         """Send an exact signed body, with bounded opt-in transport retries."""
         if len(body) > self.MAX_REQUEST_BYTES:
@@ -610,6 +632,7 @@ class CompanionsClient:
         privacy_error_code: PrivacyOperationErrorCode | None = None
         privacy_operation_completed: bool | None = None
         privacy_retry_after_seconds: int | None = None
+        existing_identity_link_required = False
         protocol_message: str | None = None
         response_body: bytes | None = None
         request_headers: dict[str, str] = {}
@@ -650,7 +673,7 @@ class CompanionsClient:
                             elif not 200 <= status_code < 300:
                                 terminal_kind = "service"
                                 terminal_status = status_code
-                                if classify_privacy_error:
+                                if classify_privacy_error or classify_existing_identity_miss:
                                     privacy_retry_after_seconds = self._parse_retry_after_seconds(
                                         active_response.headers.get("Retry-After")
                                     )
@@ -659,10 +682,15 @@ class CompanionsClient:
                                         _error_protocol_message,
                                     ) = await self._read_response_bounded(active_response)
                                     if error_body is not None:
-                                        (
-                                            privacy_error_code,
-                                            privacy_operation_completed,
-                                        ) = self._classify_privacy_error_body(error_body)
+                                        if classify_privacy_error:
+                                            (
+                                                privacy_error_code,
+                                                privacy_operation_completed,
+                                            ) = self._classify_privacy_error_body(error_body)
+                                        if classify_existing_identity_miss and status_code == 404:
+                                            existing_identity_link_required = (
+                                                self._is_existing_identity_link_required(error_body)
+                                            )
                                         error_body = None
                             else:
                                 response_body, protocol_message = await self._read_response_bounded(
@@ -704,6 +732,12 @@ class CompanionsClient:
                     operation_completed=privacy_operation_completed,
                     retry_after_seconds=privacy_retry_after_seconds,
                 )
+            if (
+                classify_existing_identity_miss
+                and terminal_status == 404
+                and existing_identity_link_required
+            ):
+                raise ExistingIdentityLinkRequiredError()
             raise CompanionsServiceError(terminal_status)
         if terminal_kind == "transport":
             response_body = None
@@ -762,6 +796,33 @@ class CompanionsClient:
         operation_completed = completed_value if isinstance(completed_value, bool) else None
         parsed.clear()
         return code, operation_completed
+
+    @staticmethod
+    def _is_existing_identity_link_required(response_body: bytes) -> bool:
+        """Recognize only the allowlisted existing-only identify miss code."""
+        parsed: object | None = None
+        try:
+            parsed = json.loads(response_body)
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            RecursionError,
+            ValueError,
+        ):
+            return False
+        finally:
+            response_body = b""
+        if not isinstance(parsed, dict):
+            if isinstance(parsed, list):
+                parsed.clear()
+            return False
+        detail = parsed.get("detail")
+        matched = (
+            isinstance(detail, dict)
+            and detail.get("code") == ExistingIdentityLinkRequiredError.code
+        )
+        parsed.clear()
+        return matched
 
     @classmethod
     def _parse_retry_after_seconds(

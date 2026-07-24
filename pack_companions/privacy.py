@@ -74,6 +74,8 @@ class PrivacyOperationErrorCode(str, Enum):
             PrivacyOperationErrorCode.PRIVACY_OPERATION_SUPERSEDED,
             PrivacyOperationErrorCode.PRIVACY_RECEIPT_EXPIRED,
             PrivacyOperationErrorCode.PRIVACY_RECEIPT_SCHEMA_UNSUPPORTED,
+            PrivacyOperationErrorCode.STALE_ACCOUNT_INCARNATION,
+            PrivacyOperationErrorCode.STALE_PRIVACY_GENERATION,
         }:
             return PrivacyErrorDisposition.START_NEW_READ
         return PrivacyErrorDisposition.DISCARD_EVENT
@@ -216,8 +218,35 @@ class IdentifyRequest(_CanonicalRequest):
         max_length=128,
         pattern=r"^[A-Za-z0-9._~-]+$",
     )
+    # Opt-in recovery mode: Pack may return only an already-established active
+    # app-local link and its current token pair. The default preserves the
+    # historical identify ceremony, including first-account creation.
+    require_existing_link: bool = False
     expected_link_incarnation_id: UUID | None = None
     re_registration_erasure_id: UUID | None = None
+
+    def model_post_init(self, __context: object) -> None:
+        """Preserve pre-0.3.1 bytes unless existing-only mode is requested.
+
+        Some older provider builds reject unknown request fields. Keeping the
+        new false default out of canonical bytes lets ordinary identifies
+        remain byte-for-byte compatible while true is transported explicitly.
+        """
+        super().model_post_init(__context)
+        if self.require_existing_link:
+            return
+        material: dict[str, Any] = json.loads(self.request_bytes)
+        material.pop("require_existing_link", None)
+        object.__setattr__(
+            self,
+            "_canonical_request_bytes",
+            json.dumps(
+                material,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8"),
+        )
 
     @field_validator(
         "expected_link_incarnation_id",
