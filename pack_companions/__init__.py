@@ -21,6 +21,21 @@ from pack_companions.comment import (
     SemanticExpressionEnvelope,
 )
 from pack_companions.hashing import hash_email
+from pack_companions.manifest import (
+    AppManifestResponse,
+    ManifestApp,
+    ManifestAllowedContext,
+    ManifestCapability,
+    ManifestCompanion,
+    ManifestEndpoints,
+    ManifestExpressionSurface,
+    ManifestForbiddenAssumption,
+    ManifestImpulsePacing,
+    ManifestMemoryAccessPolicy,
+    ManifestPosture,
+    ManifestService,
+    ManifestSurfaceKind,
+)
 from pack_companions.privacy import (
     AccountLinkState,
     EraseForAppEvent,
@@ -59,7 +74,7 @@ from pack_companions.snapshot import (
     SnapshotUser,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __all__ = [
     "CompanionsClient",
     "CompanionsError",
@@ -68,6 +83,19 @@ __all__ = [
     "CompanionsServiceError",
     "CompanionsTransportError",
     "PrivacyOperationError",
+    "AppManifestResponse",
+    "ManifestApp",
+    "ManifestPosture",
+    "ManifestCompanion",
+    "ManifestEndpoints",
+    "ManifestService",
+    "ManifestSurfaceKind",
+    "ManifestImpulsePacing",
+    "ManifestMemoryAccessPolicy",
+    "ManifestAllowedContext",
+    "ManifestCapability",
+    "ManifestExpressionSurface",
+    "ManifestForbiddenAssumption",
     "Comment",
     "CommentEvent",
     "CommentEventType",

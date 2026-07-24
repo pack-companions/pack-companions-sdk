@@ -27,6 +27,9 @@ from pack_companions import (
     ExpressionBehaviorIntent,
     ExpressionIntent,
     ExpressionResponseMode,
+    PrivacyErrorDisposition,
+    PrivacyOperationError,
+    PrivacyOperationErrorCode,
     SemanticExpressionEnvelope,
     SnapshotActivity,
     SnapshotCompanionPreferences,
@@ -727,6 +730,118 @@ async def test_typed_comment_retries_bounded_service_unavailability() -> None:
 
     assert result.decision_id == decision_id
     assert requests == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "code",
+    [
+        "stale_account_incarnation",
+        "stale_privacy_generation",
+    ],
+)
+async def test_typed_comment_preserves_only_bounded_stale_machine_code(
+    code: str,
+) -> None:
+    upstream_marker = "comment-upstream-body-marker"
+    snapshot_marker = "comment-private-snapshot-marker"
+    api_key = "comment-api-key-marker"
+    secret = "comment-signing-secret-marker"
+    event = CommentEvent(
+        snapshot=CompanionSnapshot(
+            user=SnapshotUser(
+                id="host-user-1",
+                companion_id="puppy",
+                display_name=snapshot_marker,
+            ),
+            location=SnapshotLocation(
+                route="/practice/two-sum",
+                route_intent="practice",
+            ),
+        ),
+        client_event_id=uuid4(),
+        event_type="navigation",
+    )
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            409,
+            json={
+                "detail": {
+                    "code": code,
+                    "message": upstream_marker,
+                    "untrusted_extra": {"payload": snapshot_marker},
+                }
+            },
+        )
+
+    client = CompanionsClient(
+        api_key=api_key,
+        secret=secret,
+        service_url="https://brain.example.test",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(PrivacyOperationError) as raised:
+        await client.get_comment_event(event)
+
+    assert calls == 1
+    assert raised.value.status_code == 409
+    assert raised.value.code is PrivacyOperationErrorCode(code)
+    assert raised.value.disposition is PrivacyErrorDisposition.DISCARD_EVENT
+    assert raised.value.terminal is True
+    assert raised.value.retry_same_event is False
+    assert upstream_marker not in str(raised.value)
+    assert snapshot_marker not in str(raised.value)
+    retained = _sdk_traceback_locals(raised.value)
+    assert upstream_marker not in retained
+    assert snapshot_marker not in retained
+    assert api_key not in retained
+    assert secret not in retained
+
+
+@pytest.mark.asyncio
+async def test_typed_comment_does_not_reflect_unknown_error_code() -> None:
+    unknown_code = "future_code_with_private_suffix"
+    upstream_marker = "unknown-comment-error-body-marker"
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            409,
+            json={
+                "detail": {
+                    "code": unknown_code,
+                    "message": upstream_marker,
+                }
+            },
+        )
+
+    client = CompanionsClient(
+        api_key="public-app-key",
+        secret="test-hmac-secret",
+        service_url="https://brain.example.test",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(PrivacyOperationError) as raised:
+        await client.get_comment_event(
+            CommentEvent(
+                snapshot=_snapshot(),
+                client_event_id=uuid4(),
+                event_type="navigation",
+            )
+        )
+
+    assert raised.value.code is None
+    assert raised.value.disposition is PrivacyErrorDisposition.DISCARD_EVENT
+    assert unknown_code not in str(raised.value)
+    assert upstream_marker not in str(raised.value)
+    retained = _sdk_traceback_locals(raised.value)
+    assert unknown_code not in retained
+    assert upstream_marker not in retained
 
 
 @pytest.mark.asyncio

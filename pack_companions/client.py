@@ -18,6 +18,7 @@ from pack_companions.comment import (
     CommentEventType,
     CommentResult,
 )
+from pack_companions.manifest import AppManifestResponse
 from pack_companions.privacy import (
     EraseForAppEvent,
     EraseForAppResult,
@@ -210,6 +211,24 @@ class CompanionsClient:
         """Authenticated round-trip — verifies signing works end-to-end."""
         return await self._signed_request("GET", "/v1/ping")
 
+    async def get_app_manifest(self) -> AppManifestResponse:
+        """Return the authenticated app's validated platform-v2 manifest.
+
+        The response must declare a compatible platform/comment contract,
+        known posture vocabulary, canonical unique roster IDs, and the exact
+        platform-v2 endpoint paths before it is exposed to the host.
+        """
+        data = await self._signed_request(
+            "GET",
+            AppManifestResponse.PATH,
+            max_attempts=1,
+        )
+        return self._parse_model(
+            data,
+            AppManifestResponse,
+            invalid_message="service returned an invalid app manifest",
+        )
+
     async def identify(self, request: IdentifyRequest) -> IdentifyResponse:
         """Bootstrap or explicitly recover one app-local account link.
 
@@ -387,6 +406,11 @@ class CompanionsClient:
                 body=body,
                 max_attempts=self.comment_max_attempts,
                 retryable_statuses=self._RETRYABLE_COMMENT_STATUSES,
+                # Typed facts are bound to the same account incarnation and
+                # privacy generation as mutations. Preserve only the bounded,
+                # allowlisted machine metadata so a host queue can terminally
+                # discard stale work instead of retrying it forever.
+                classify_privacy_error=True,
             )
         except CompanionsError:
             body = b""

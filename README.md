@@ -6,7 +6,8 @@ Python SDK for the [Pack Companions Service](https://github.com/pack-companions/
 
 A thin, async Python client that lets your FastAPI (or any server-side Python)
 app talk to the Pack Companions service without reimplementing HMAC signing or
-comment-decision retries.
+comment-decision retries. The authenticated app manifest is typed and validated
+before a host enables companion runtime behavior.
 
 This SDK is **server-only**. Its HMAC secret must never be embedded in a browser,
 mobile app, public bundle, log, or error response.
@@ -64,6 +65,18 @@ client = CompanionsClient(
     secret="your_app_hmac_secret",
     service_url="https://companions.example.internal",
 )
+
+# Fetch this server-side at startup or before enabling the runtime. The SDK
+# rejects an incompatible platform major, comment contract, posture vocabulary,
+# endpoint set, or duplicate roster ID.
+manifest = await client.get_app_manifest()
+for companion in manifest.companions:
+    # Character id is brain state; species is Pack-owned visual selection.
+    register_selector_option(
+        companion_id=companion.id,
+        species=companion.species,
+        display_name=companion.display_name,
+    )
 
 session_id = uuid4()
 snapshot = CompanionSnapshot(
@@ -170,6 +183,13 @@ failures with the exact same request bytes and `client_event_id`. The default is
 two total attempts and the configurable maximum is three. Public SDK failures
 are sanitized: they never expose the signed HTTP request, response body, HMAC
 headers, or snapshot payload.
+
+Typed comment facts are also bound to the captured app-account incarnation and
+privacy generation. A Brain `409` carrying the allowlisted
+`stale_account_incarnation` or `stale_privacy_generation` code raises
+`PrivacyOperationError` with `disposition=discard_event`. Discard that queued
+fact permanently; never identify again and replay its old bytes. The upstream
+message/body and signing material are not retained by the public exception.
 
 For a retry performed by your own queue, HTTP handler, or worker, reuse the same
 `CommentEvent`; do not create a new UUID for the same logical fact. Reusing an ID
@@ -327,12 +347,15 @@ A compatibility table will be maintained here as the service stabilizes.
 
 ## Status
 
-- `0.2.0` is a locally verified, unpublished platform-contract 2.0 candidate.
+- `0.2.0` is the tagged platform-contract 2.0 baseline.
+- `0.2.1` adds authenticated app-manifest validation and preserves the bounded
+  stale-incarnation/stale-generation machine codes required by durable comment
+  queues.
 - HMAC signing, typed comment decisions, exact privacy-operation retries, and
   durable app-erasure events are implemented.
 - General chat/streaming methods are not part of this SDK candidate.
-- Publication and production compatibility are not claimed until coordinated
-  service and consumer release gates pass.
+- Production compatibility still depends on coordinated service and consumer
+  release gates.
 
 ## License
 
