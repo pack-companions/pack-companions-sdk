@@ -158,6 +158,10 @@ class ManifestEndpoints(_ManifestModel):
         ),
         ("identify", "/v1/identity/identify"),
         ("link_status", "/v1/identity/link-status"),
+        (
+            "connected_apps_status",
+            "/v1/identity/connected-apps/status",
+        ),
         ("erase_for_app", "/v1/identity/erase-for-app"),
         ("letters", "/v1/companion/letters"),
         ("letters_ack", "/v1/companion/letters/ack"),
@@ -181,6 +185,7 @@ class ManifestEndpoints(_ManifestModel):
     share_memory_set: str
     identify: str
     link_status: str
+    connected_apps_status: str
     erase_for_app: str
     letters: str
     letters_ack: str

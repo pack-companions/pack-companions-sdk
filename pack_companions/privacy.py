@@ -258,6 +258,80 @@ class IdentifyResponse(_FrozenModel):
         return AccountLinkState.from_identify(self)
 
 
+class ConnectedAppsStatusRequest(_CanonicalRequest):
+    """Read one existing app-owned link without minting an identity."""
+
+    PATH: ClassVar[str] = "/v1/identity/connected-apps/status"
+
+    host_user_id: str = Field(min_length=1, max_length=255)
+    expected_link_incarnation_id: UUID | None = None
+    expected_privacy_generation: PrivacyGeneration | None = None
+
+    @field_validator("expected_link_incarnation_id")
+    @classmethod
+    def _reject_nil_incarnation(cls, value: UUID | None) -> UUID | None:
+        if value is not None and value.int == 0:
+            raise ValueError("expected_link_incarnation_id must not be the nil UUID")
+        return value
+
+
+class CurrentAppConnectionStatus(_FrozenModel):
+    """Calling-app view of its link without echoing the host handle."""
+
+    app_id: UUID
+    app_key: str = Field(min_length=1, max_length=100)
+    linked: bool
+    link_status: (
+        Literal[
+            "provisional",
+            "active",
+            "suspended",
+            "revoked",
+        ]
+        | None
+    ) = None
+
+    @field_validator("app_id")
+    @classmethod
+    def _reject_nil_app_id(cls, value: UUID) -> UUID:
+        if value.int == 0:
+            raise ValueError("app_id must not be the nil UUID")
+        return value
+
+
+class ConnectedAppStatus(_FrozenModel):
+    """Proof-verified connected app safe for account-management UI."""
+
+    app_id: UUID
+    app_key: str = Field(min_length=1, max_length=100)
+    link_status: Literal["active"]
+    app_status: Literal["active", "suspended", "revoked"]
+    is_current_app: bool
+
+    @field_validator("app_id")
+    @classmethod
+    def _reject_nil_app_id(cls, value: UUID) -> UUID:
+        if value.int == 0:
+            raise ValueError("app_id must not be the nil UUID")
+        return value
+
+
+class ConnectedAppsStatusResponse(_FrozenModel):
+    """Read-only proof and connection status for an existing account link."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    schema_version: Literal["v1"]
+    current_app_link: CurrentAppConnectionStatus
+    explicit_cross_app_proof_verified: bool
+    verified_connected_app_count: int = Field(strict=True, ge=0)
+    connected_apps_truncated: bool
+    connected_apps: tuple[ConnectedAppStatus, ...] = Field(
+        default_factory=tuple,
+        max_length=32,
+    )
+
+
 class EraseForAppEvent(_CanonicalRequest):
     """One durable app-account erasure job from Platform Contract ID-4.
 

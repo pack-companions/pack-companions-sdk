@@ -20,6 +20,8 @@ from pack_companions.comment import (
 )
 from pack_companions.manifest import AppManifestResponse
 from pack_companions.privacy import (
+    ConnectedAppsStatusRequest,
+    ConnectedAppsStatusResponse,
     EraseForAppEvent,
     EraseForAppResult,
     IdentifyRequest,
@@ -254,6 +256,30 @@ class CompanionsClient:
             data,
             IdentifyResponse,
             invalid_message="service returned an invalid identify response",
+        )
+
+    async def get_connected_apps_status(
+        self,
+        request: ConnectedAppsStatusRequest,
+    ) -> ConnectedAppsStatusResponse:
+        """Read explicit-link status without identifying or joining accounts."""
+        body = request.request_bytes
+        del request
+        try:
+            data = await self._signed_request(
+                "POST",
+                ConnectedAppsStatusRequest.PATH,
+                body=body,
+                max_attempts=1,
+            )
+        except CompanionsError:
+            body = b""
+            raise
+        body = b""
+        return self._parse_model(
+            data,
+            ConnectedAppsStatusResponse,
+            invalid_message=("service returned an invalid connected-app status response"),
         )
 
     async def erase_for_app(
