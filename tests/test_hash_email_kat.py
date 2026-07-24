@@ -1,9 +1,8 @@
-"""Known Answer Tests for the email_hash recipe (Phase H).
+"""Known Answer Tests for the legacy email-hash discovery recipe.
 
 Locks the SDK's `hash_email` implementation to the same canonical
-recipe as the service and JS SDK. If any vector fails, the SDK has
-drifted and would produce different cross-app identity matches than
-the other two implementations.
+recipe as the service and JS SDK. The hash is not account-ownership proof and
+does not authorize cross-app linking.
 
 The fixture is mirrored from
 pack-companions/tests/fixtures/hash_email_kat.json.
