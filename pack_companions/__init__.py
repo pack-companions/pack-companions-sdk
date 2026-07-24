@@ -38,6 +38,10 @@ from pack_companions.manifest import (
 )
 from pack_companions.privacy import (
     AccountLinkState,
+    ConnectedAppStatus,
+    ConnectedAppsStatusRequest,
+    ConnectedAppsStatusResponse,
+    CurrentAppConnectionStatus,
     EraseForAppEvent,
     EraseForAppResult,
     IdentifyRequest,
@@ -74,7 +78,7 @@ from pack_companions.snapshot import (
     SnapshotUser,
 )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __all__ = [
     "CompanionsClient",
     "CompanionsError",
@@ -106,6 +110,10 @@ __all__ = [
     "ExpressionResponseMode",
     "SemanticExpressionEnvelope",
     "AccountLinkState",
+    "ConnectedAppStatus",
+    "ConnectedAppsStatusRequest",
+    "ConnectedAppsStatusResponse",
+    "CurrentAppConnectionStatus",
     "EraseForAppEvent",
     "EraseForAppResult",
     "IdentifyRequest",

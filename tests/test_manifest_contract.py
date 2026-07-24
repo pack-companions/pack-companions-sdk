@@ -14,6 +14,7 @@ from pack_companions import (
     AppManifestResponse,
     CompanionsClient,
     CompanionsProtocolError,
+    ConnectedAppsStatusRequest,
 )
 
 
@@ -71,6 +72,7 @@ def _manifest_payload(*, app_id: UUID | None = None) -> dict[str, object]:
             "share_memory_set": "/v1/user-settings/share-memory-across-apps/set",
             "identify": "/v1/identity/identify",
             "link_status": "/v1/identity/link-status",
+            "connected_apps_status": "/v1/identity/connected-apps/status",
             "erase_for_app": "/v1/identity/erase-for-app",
             "letters": "/v1/companion/letters",
             "letters_ack": "/v1/companion/letters/ack",
@@ -113,8 +115,24 @@ def test_manifest_models_are_typed_immutable_and_forward_compatible() -> None:
     assert manifest.companions[0].id == "byte"
     assert manifest.companions[0].species == "puppy"
     assert manifest.endpoints.companion_picker == "/v1/companions/picker"
+    assert manifest.endpoints.connected_apps_status == "/v1/identity/connected-apps/status"
     with pytest.raises(ValidationError, match="frozen"):
         manifest.posture.surface_kind = "mobile"
+
+
+def test_connected_apps_read_forbids_join_keys_and_nil_incarnations() -> None:
+    with pytest.raises(ValidationError):
+        ConnectedAppsStatusRequest.model_validate(
+            {
+                "host_user_id": "host-user",
+                "email_hash": "a" * 64,
+            }
+        )
+    with pytest.raises(ValidationError):
+        ConnectedAppsStatusRequest(
+            host_user_id="host-user",
+            expected_link_incarnation_id=UUID(int=0),
+        )
 
 
 @pytest.mark.parametrize(
@@ -197,6 +215,78 @@ async def test_client_fetches_manifest_with_exact_authenticated_empty_get() -> N
     assert manifest.app.id == app_id
     assert manifest.companions[0].id == "byte"
     assert manifest.companions[0].species == "puppy"
+
+
+@pytest.mark.asyncio
+async def test_client_reads_connected_apps_without_identifying() -> None:
+    secret = "connected-app-secret"
+    app_id = uuid4()
+    other_app_id = uuid4()
+    request = ConnectedAppsStatusRequest(
+        host_user_id="host-user",
+        expected_link_incarnation_id=uuid4(),
+        expected_privacy_generation=4,
+    )
+
+    async def handler(wire_request: httpx.Request) -> httpx.Response:
+        body = await wire_request.aread()
+        timestamp = wire_request.headers["X-Pack-Timestamp"]
+        signing_string = (f"{timestamp}\nPOST\n/v1/identity/connected-apps/status\n").encode(
+            "utf-8"
+        ) + body
+        expected_signature = hmac.new(
+            secret.encode("utf-8"),
+            signing_string,
+            hashlib.sha256,
+        ).hexdigest()
+        assert wire_request.url.path == request.PATH
+        assert body == request.request_bytes
+        assert wire_request.headers["X-Pack-Signature"] == expected_signature
+        return httpx.Response(
+            200,
+            json={
+                "schema_version": "v1",
+                "current_app_link": {
+                    "app_id": str(app_id),
+                    "app_key": "boop",
+                    "linked": True,
+                    "link_status": "active",
+                },
+                "explicit_cross_app_proof_verified": True,
+                "verified_connected_app_count": 2,
+                "connected_apps_truncated": False,
+                "connected_apps": [
+                    {
+                        "app_id": str(app_id),
+                        "app_key": "boop",
+                        "link_status": "active",
+                        "app_status": "active",
+                        "is_current_app": True,
+                    },
+                    {
+                        "app_id": str(other_app_id),
+                        "app_key": "getpacked",
+                        "link_status": "active",
+                        "app_status": "active",
+                        "is_current_app": False,
+                    },
+                ],
+            },
+        )
+
+    client = CompanionsClient(
+        api_key="connected-app-key",
+        secret=secret,
+        service_url="https://brain.example.test",
+        transport=httpx.MockTransport(handler),
+    )
+
+    response = await client.get_connected_apps_status(request)
+
+    assert response.current_app_link.app_id == app_id
+    assert response.explicit_cross_app_proof_verified is True
+    assert response.verified_connected_app_count == 2
+    assert response.connected_apps[1].app_key == "getpacked"
 
 
 @pytest.mark.asyncio
