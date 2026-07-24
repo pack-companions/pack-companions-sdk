@@ -7,6 +7,7 @@ from pack_companions.client import (
     CompanionsProtocolError,
     CompanionsServiceError,
     CompanionsTransportError,
+    ExistingIdentityLinkRequiredError,
     PrivacyOperationError,
 )
 from pack_companions.comment import (
@@ -89,7 +90,7 @@ from pack_companions.snapshot import (
     SnapshotUser,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __all__ = [
     "CompanionsClient",
     "CompanionsError",
@@ -97,6 +98,7 @@ __all__ = [
     "CompanionsProtocolError",
     "CompanionsServiceError",
     "CompanionsTransportError",
+    "ExistingIdentityLinkRequiredError",
     "PrivacyOperationError",
     "AppManifestResponse",
     "ManifestApp",

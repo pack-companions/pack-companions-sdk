@@ -791,7 +791,9 @@ async def test_typed_comment_preserves_only_bounded_stale_machine_code(
     assert calls == 1
     assert raised.value.status_code == 409
     assert raised.value.code is PrivacyOperationErrorCode(code)
-    assert raised.value.disposition is PrivacyErrorDisposition.DISCARD_EVENT
+    assert raised.value.disposition is PrivacyErrorDisposition.START_NEW_READ
+    # The disposition permits a fresh authoritative read, never replay of
+    # this exact stale comment event.
     assert raised.value.terminal is True
     assert raised.value.retry_same_event is False
     assert upstream_marker not in str(raised.value)

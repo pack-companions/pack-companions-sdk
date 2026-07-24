@@ -14,9 +14,11 @@ from pack_companions import (
     AccountLinkState,
     CompanionsClient,
     CompanionsProtocolError,
+    CompanionsServiceError,
     CompanionsTransportError,
     EraseForAppEvent,
     EraseForAppResult,
+    ExistingIdentityLinkRequiredError,
     IdentifyRequest,
     IdentifyResponse,
     LinkStatusEvent,
@@ -384,7 +386,189 @@ async def test_identify_returns_generation_and_uses_one_exact_request() -> None:
 
     assert result.privacy_generation == 13
     assert seen == [("/v1/identity/identify", identify.request_bytes)]
+    assert "require_existing_link" not in json.loads(seen[0][1])
+    assert identify.request_bytes == json.dumps(
+        {
+            "email_hash": None,
+            "expected_link_incarnation_id": str(incarnation),
+            "host_user_id": "host-user-1",
+            "identity_subject": None,
+            "re_registration_erasure_id": None,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
     assert "expected_privacy_generation" not in json.loads(seen[0][1])
+
+
+@pytest.mark.asyncio
+async def test_identify_transports_existing_only_recovery_opt_in() -> None:
+    incarnation = uuid4()
+    seen: list[bytes] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "global_user_id": "pcu_abcdefghijklmnopqrstuvwx23",
+                "is_new": False,
+                "link_incarnation_id": str(incarnation),
+                "privacy_generation": 21,
+                "linked_keys": [],
+            },
+        )
+
+    identify = IdentifyRequest(
+        host_user_id="host-user-existing",
+        require_existing_link=True,
+    )
+    client = CompanionsClient(
+        api_key="test-key",
+        secret="test-secret",
+        service_url="https://pack.invalid",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = await client.identify(identify)
+
+    assert len(seen) == 1
+    assert json.loads(seen[0])["require_existing_link"] is True
+    assert IdentifyRequest.from_request_bytes(identify.request_bytes).require_existing_link is True
+    assert result.is_new is False
+    assert result.link_incarnation_id == incarnation
+    assert result.privacy_generation == 21
+
+
+@pytest.mark.asyncio
+async def test_identify_existing_only_rejects_a_minting_provider_response() -> None:
+    incarnation = uuid4()
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "global_user_id": "pcu_abcdefghijklmnopqrstuvwx23",
+                "is_new": True,
+                "link_incarnation_id": str(incarnation),
+                "privacy_generation": 0,
+                "linked_keys": [],
+            },
+        )
+
+    client = CompanionsClient(
+        api_key="test-key",
+        secret="test-secret",
+        service_url="https://pack.invalid",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(
+        CompanionsProtocolError,
+        match="existing-only recovery",
+    ):
+        await client.identify(
+            IdentifyRequest(
+                host_user_id="host-user-existing",
+                require_existing_link=True,
+            )
+        )
+
+
+@pytest.mark.asyncio
+async def test_identify_existing_only_types_only_exact_missing_link_code() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={
+                "detail": {
+                    "code": "existing_identity_link_required",
+                }
+            },
+        )
+
+    client = CompanionsClient(
+        api_key="test-key",
+        secret="test-secret",
+        service_url="https://pack.invalid",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(ExistingIdentityLinkRequiredError) as raised:
+        await client.identify(
+            IdentifyRequest(
+                host_user_id="host-user-never-linked",
+                require_existing_link=True,
+            )
+        )
+
+    assert raised.value.status_code == 404
+    assert raised.value.code == "existing_identity_link_required"
+    assert raised.value.args == ("Pack Companions service returned HTTP 404",)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"detail": "Not Found"},
+        {"detail": {"code": "unknown_existing_link_error"}},
+        {"code": "existing_identity_link_required"},
+    ],
+)
+async def test_identify_existing_only_keeps_other_404s_generic(
+    body: dict[str, object],
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json=body)
+
+    client = CompanionsClient(
+        api_key="test-key",
+        secret="test-secret",
+        service_url="https://pack.invalid",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(CompanionsServiceError) as raised:
+        await client.identify(
+            IdentifyRequest(
+                host_user_id="host-user-existing",
+                require_existing_link=True,
+            )
+        )
+
+    assert type(raised.value) is CompanionsServiceError
+    assert raised.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_ordinary_identify_keeps_allowlisted_missing_code_generic() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            404,
+            json={
+                "detail": {
+                    "code": "existing_identity_link_required",
+                }
+            },
+        )
+
+    client = CompanionsClient(
+        api_key="test-key",
+        secret="test-secret",
+        service_url="https://pack.invalid",
+        transport=httpx.MockTransport(handler),
+    )
+
+    with pytest.raises(CompanionsServiceError) as raised:
+        await client.identify(
+            IdentifyRequest(
+                host_user_id="host-user-new",
+            )
+        )
+
+    assert type(raised.value) is CompanionsServiceError
+    assert raised.value.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -734,11 +918,11 @@ _ERROR_CASES = [
     ),
     (
         "stale_account_incarnation",
-        PrivacyErrorDisposition.DISCARD_EVENT,
+        PrivacyErrorDisposition.START_NEW_READ,
     ),
     (
         "stale_privacy_generation",
-        PrivacyErrorDisposition.DISCARD_EVENT,
+        PrivacyErrorDisposition.START_NEW_READ,
     ),
     (
         "privacy_event_conflict",
@@ -815,6 +999,14 @@ async def test_privacy_errors_are_sanitized_and_actionably_classified(
         disposition is PrivacyErrorDisposition.RETRY_SAME_EVENT
     )
     assert raised.value.terminal is (disposition is not PrivacyErrorDisposition.RETRY_SAME_EVENT)
+    if code in {
+        "stale_account_incarnation",
+        "stale_privacy_generation",
+    }:
+        # START_NEW_READ authorizes only reconciliation and a new operation.
+        # The exact stale event remains terminal and must never be replayed.
+        assert raised.value.operation_completed is False
+        assert raised.value.terminal is True
     assert raised.value.retry_after_seconds == (
         1 if code == "privacy_operation_in_progress" else None
     )

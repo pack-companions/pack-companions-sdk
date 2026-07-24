@@ -32,8 +32,10 @@ Persist the `link_incarnation_id` and `privacy_generation` returned by Pack
 identify atomically with the host account. Place them in runtime snapshots as
 `expected_link_incarnation_id` and `expected_privacy_generation`. Capture both
 inside every durable queued event. If Pack returns `stale_account_incarnation`
-or `stale_privacy_generation`, discard the old operation: never fetch new
-tokens and replay old content against them.
+or `stale_privacy_generation`, the old operation is terminal and must never be
+replayed. `start_new_read` means discard those exact bytes, recover only an
+existing link, read authoritative state, and create a brand-new operation only
+if the user action is still needed.
 
 ## Install
 
@@ -207,9 +209,20 @@ headers, or snapshot payload.
 Typed comment facts are also bound to the captured app-account incarnation and
 privacy generation. A Brain `409` carrying the allowlisted
 `stale_account_incarnation` or `stale_privacy_generation` code raises
-`PrivacyOperationError` with `disposition=discard_event`. Discard that queued
-fact permanently; never identify again and replay its old bytes. The upstream
-message/body and signing material are not retained by the public exception.
+`PrivacyOperationError` with `disposition=start_new_read`. The queued fact is
+still terminal: delete its exact bytes and UUID, and never identify then replay
+them. A host may make an existing-only identify request, perform a fresh
+authoritative read, and create a separate event with a new UUID if the action
+is still required. The upstream message/body and signing material are not
+retained by the public exception.
+
+If that explicit existing-only request finds no active link, the service's
+exact HTTP 404 machine code is surfaced as
+`ExistingIdentityLinkRequiredError`. The exception is constructed without the
+response body and carries only the fixed `status_code=404` and
+`code=existing_identity_link_required`. The SDK classifies no other 404 this
+way: a missing route, older provider, malformed response, or ordinary identify
+remains a generic `CompanionsServiceError` and must fail closed.
 
 For a retry performed by your own queue, HTTP handler, or worker, reuse the same
 `CommentEvent`; do not create a new UUID for the same logical fact. Reusing an ID
@@ -343,16 +356,20 @@ are never reflected:
 - `retry_same_event`: preserve the complete event and retry it unchanged after
   the indicated delay or operator reconciliation. `Retry-After` is accepted
   only as validated delta-seconds from 0 through 3,600.
-- `discard_event`: the captured incarnation/generation is stale or the UUID was
-  reused incorrectly. Never refresh tokens and replay it.
-- `start_new_read`: the old receipt is superseded, expired, or unreadable.
-  Discard it and obtain current state with a fresh authenticated read before
-  creating any new mutation.
+- `discard_event`: the UUID was reused incorrectly or the failure is otherwise
+  terminal without a safe recovery read. Never refresh tokens and replay it.
+- `start_new_read`: the captured incarnation/generation is stale, or the old
+  receipt is superseded, expired, or unreadable. The original event remains
+  terminal. Discard it, recover an existing link with
+  `IdentifyRequest(require_existing_link=True)`, and obtain current state with
+  a fresh authenticated read before creating any new mutation.
 
 Use `AccountLinkState.reconcile_identify(...)` only for a genuinely fresh
-identify ceremony. It retains the maximum generation within the same
-incarnation and resets generation only when identify proves a different
-incarnation. The SDK intentionally keeps no global per-user state.
+identify ceremony or existing-only token recovery. It retains the maximum
+generation within the same incarnation and resets generation only when
+identify proves a different incarnation. Existing-only recovery never creates
+or mutates a Pack identity and must return `is_new=False`. The SDK intentionally
+keeps no global per-user state.
 
 ## Versioning
 
