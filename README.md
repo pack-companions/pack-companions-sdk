@@ -78,6 +78,11 @@ for companion in manifest.companions:
         display_name=companion.display_name,
     )
 
+# Fetch roster-filtered runtime availability with another signed, empty GET.
+# This returns only validated discovery metadata and immutable pointers.
+runtime_discovery = await client.get_runtime_catalog()
+relay_to_renderer(runtime_discovery.model_dump(mode="json"))
+
 session_id = uuid4()
 snapshot = CompanionSnapshot(
     user=SnapshotUser(
@@ -175,6 +180,21 @@ speech. The decision also preserves:
 
 Expression values are semantic only. They never contain asset paths, filenames,
 URLs, or executable renderer instructions.
+
+## Runtime catalog discovery
+
+`get_runtime_catalog()` validates the provider's
+`pack-runtime-discovery/v1` response, exact Pack CDN origin, `/byte`
+quarantine, explicit available/unavailable state, and content-addressed
+catalog pointers. It performs one signed `GET /v1/runtime-catalog` with no
+request body and no automatic retry.
+
+This Python SDK deliberately stops at discovery. It does not download, cache,
+activate, or validate the referenced asset catalog. Relay the client-safe
+discovery result from your authenticated backend; the JS renderer or native
+client must enforce the full catalog, asset integrity, sequence, dimension,
+timing, style, and atomic last-known-good rules. Never relay Pack HMAC
+credentials.
 
 ## Retry and compatibility rules
 

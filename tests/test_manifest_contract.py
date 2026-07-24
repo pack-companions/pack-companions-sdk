@@ -77,12 +77,14 @@ def _manifest_payload(*, app_id: UUID | None = None) -> dict[str, object]:
             "letters": "/v1/companion/letters",
             "letters_ack": "/v1/companion/letters/ack",
             "companion_picker": "/v1/companions/picker",
+            "runtime_catalog": "/v1/runtime-catalog",
         },
         "service": {
             "version": "0.1.0",
             "platform_contract_version": "2.0.0",
             "comment_contract_version": "v1",
             "picker_version": "2026-07-23.1",
+            "runtime_catalog_schema_version": "pack-runtime-catalog/v1",
         },
     }
 
@@ -115,7 +117,9 @@ def test_manifest_models_are_typed_immutable_and_forward_compatible() -> None:
     assert manifest.companions[0].id == "byte"
     assert manifest.companions[0].species == "puppy"
     assert manifest.endpoints.companion_picker == "/v1/companions/picker"
+    assert manifest.endpoints.runtime_catalog == "/v1/runtime-catalog"
     assert manifest.endpoints.connected_apps_status == "/v1/identity/connected-apps/status"
+    assert manifest.service.runtime_catalog_schema_version == "pack-runtime-catalog/v1"
     with pytest.raises(ValidationError, match="frozen"):
         manifest.posture.surface_kind = "mobile"
 
@@ -155,6 +159,18 @@ def test_connected_apps_read_forbids_join_keys_and_nil_incarnations() -> None:
         ),
         lambda payload: payload["endpoints"].update(  # type: ignore[union-attr]
             comment="https://attacker.invalid/v1/comment"
+        ),
+        lambda payload: payload["endpoints"].update(  # type: ignore[union-attr]
+            runtime_catalog="https://attacker.invalid/v1/runtime-catalog"
+        ),
+        lambda payload: payload["endpoints"].pop(  # type: ignore[union-attr]
+            "runtime_catalog"
+        ),
+        lambda payload: payload["service"].update(  # type: ignore[union-attr]
+            runtime_catalog_schema_version="pack-runtime-catalog/v2"
+        ),
+        lambda payload: payload["service"].pop(  # type: ignore[union-attr]
+            "runtime_catalog_schema_version"
         ),
         lambda payload: payload["companions"].append(  # type: ignore[union-attr]
             {
