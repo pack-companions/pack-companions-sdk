@@ -515,7 +515,8 @@ class CompanionsClient:
             except CompanionsError:
                 del snapshot
                 raise
-        assert client_event_id is not None
+        if client_event_id is None:  # pragma: no cover - paired check above
+            raise ValueError("event_type and client_event_id must be supplied together")
         event = CommentEvent(
             snapshot=snapshot,
             client_event_id=client_event_id,
@@ -724,7 +725,8 @@ class CompanionsClient:
             raise CompanionsAuthError(f"service rejected credentials ({terminal_status})")
         if terminal_kind == "service":
             response_body = None
-            assert terminal_status is not None
+            if terminal_status is None:  # pragma: no cover - defensive invariant
+                raise CompanionsProtocolError("service failure without a status")
             if classify_privacy_error:
                 raise PrivacyOperationError(
                     terminal_status,
